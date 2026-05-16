@@ -1,0 +1,54 @@
+# ============================================
+# 租房助手 - 用户偏好配置
+# 修改后重新运行 main.py 即可生效，无需改代码
+# ============================================
+
+preferences:
+  budget_min: 2000
+  budget_max: 5000
+  area_min: 20
+  area_max: 80
+  preferred_districts:
+    - "海淀区"
+    - "朝阳区"
+  preferred_subway_stations:
+    - "西二旗"
+    - "上地"
+    - "清河"
+    - "知春路"
+  max_commute_minutes: 45
+  workplace_station: "西二旗"
+  required_facilities:
+    - "独卫"
+    - "空调"
+  preferred_rooms:
+    - "1室"
+    - "2室"
+
+scrapers:
+  lianjia:
+    enabled: true
+    city: "beijing"
+    request_interval: 5.0
+    max_pages: 3
+  beike:
+    enabled: true
+    city: "beijing"
+    request_interval: 5.0
+    max_pages: 3
+  douban:
+    enabled: true
+    groups:
+      - ["beijingzufang", "北京租房"]
+      - ["549574", "北京租房2"]
+    cookie: 'll="118137"; bid=sNATksG9Ols; dbcl2="289707588:guy+VBuv7G0"; ck=jMCc; ap_v=0,6.0; push_noty_num=0; push_doumail_num=0; frodotk_db="52a89155bdf5971af7f9b40139e0c54e"'
+    max_pages: 3
+    exclude_keywords:
+      - "求租"
+
+scoring:
+  min_score_to_notify: 80
+
+notification:
+  dingtalk_webhook: "https://oapi.dingtalk.com/robot/send?access_token=c194c250e078ca42aa927eac14e84de38742b4b4ab01559441223dba85cbb953"
+  dingtalk_secret: "SECc29b88078e1a745c47b517a4f3268d67fa6faddb080ca0c9b4f684c384acd58e"
