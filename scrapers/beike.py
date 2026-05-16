@@ -18,6 +18,7 @@ BEIKE_CITIES = {
     "wuhan": "https://wh.zu.ke.com",
     "tianjin": "https://tj.zu.ke.com",
     "chongqing": "https://cq.zu.ke.com",
+    "changchun": "https://cc.zu.ke.com",
 }
 
 

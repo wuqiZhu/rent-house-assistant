@@ -38,6 +38,7 @@ LIANJIA_CITIES = {
     "zhengzhou": "https://zz.lianjia.com/zufang/",
     "zhongshan": "https://zs.lianjia.com/zufang/",
     "zhuhai": "https://zh.lianjia.com/zufang/",
+    "changchun": "https://cc.lianjia.com/zufang/",
 }
 
 

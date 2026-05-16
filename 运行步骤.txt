@@ -1,0 +1,114 @@
+========================================
+租房助手 - 使用说明与注意事项
+========================================
+
+一、日常使用（基本不用管）
+----------------------------------------
+GitHub Actions 每天 08:00 和 20:00（北京时间）自动运行。
+有高分房源自动推送到你钉钉，你什么都不用做，只管看手机就行。
+
+
+二、手动运行
+----------------------------------------
+打开终端，执行以下命令：
+
+    cd C:\Users\zhuxiangbo\Desktop\project\rent_house\rent_house_assistant
+    python main.py
+
+
+三、需要注意的 3 件事
+----------------------------------------
+
+【1. 豆瓣 Cookie 会过期（大约每 2-4 周）】
+
+    症状：钉钉通知里只有链家/贝壳的房源，没有豆瓣的
+
+    解决步骤：
+    1) 浏览器打开 https://www.douban.com 并登录
+    2) 按 F12 打开开发者工具
+    3) 点击 Network（网络）标签
+    4) 随便点一个请求，找到 Request Headers 里的 Cookie
+    5) 复制整串 Cookie 内容
+    6) 更新本地 config.yaml 里的 cookie 字段
+    7) 同步更新 GitHub Secrets 里的 DOUBAN_COOKIE
+       （仓库页面 → Settings → Secrets and variables → Actions → 编辑 DOUBAN_COOKIE）
+
+
+【2. 链家/贝壳可能改版（概率低，但有可能）】
+
+    症状：运行日志里出现"未找到房源列表项"或抓取数突然变成 0
+
+    解决：联系开发者更新选择器代码，然后 git push 即可
+
+
+【3. 钉钉推送太多或太少】
+
+    解决：修改 config.yaml 里的 min_score_to_notify 值
+    - 推送太多 → 调高（如 70 或 80）
+    - 推送太少 → 调低（如 50）
+
+    修改后需要同步到 GitHub：
+        git add .
+        git commit -m "调整推送阈值"
+        git push
+
+
+四、修改偏好配置
+----------------------------------------
+编辑 config.yaml 文件，可以调整以下内容：
+
+    - 预算范围（budget_min / budget_max）
+    - 目标区域（preferred_districts）
+    - 目标地铁站（preferred_subway_stations）
+    - 工作地点（workplace_station）
+    - 可接受通勤时间（max_commute_minutes）
+    - 面积范围（area_min / area_max）
+    - 必需设施（required_facilities）
+    - 推送阈值（min_score_to_notify）
+    - 启用/禁用某个爬虫（各 scraper 的 enabled 字段）
+
+修改后推送到 GitHub 生效：
+    git add .
+    git commit -m "更新偏好配置"
+    git push
+
+
+五、查看运行日志
+----------------------------------------
+GitHub Actions 运行日志：
+    仓库页面 → Actions → 点击最近一次运行 → 展开 run 步骤
+
+本地运行日志：
+    直接在终端输出中查看
+
+
+六、常见问题
+----------------------------------------
+
+Q: 钉钉收不到通知？
+A: 1) 检查是否有人房源达到推送阈值（看日志里的评分）
+   2) 检查 GitHub Secrets 里的 DINGTALK_WEBHOOK 和 DINGTALK_SECRET 是否正确
+   3) 检查钉钉机器人是否还在群里
+
+Q: GitHub Actions 运行失败？
+A: 1) 查看 Actions 页面的错误日志
+   2) 最常见原因是 Cookie 过期或网络超时
+   3) 重新运行一次试试（Actions → Run workflow）
+
+Q: 想增加新的数据源？
+A: 在 scrapers/ 目录下新建爬虫文件，参考 lianjia.py 的格式，
+   然后在 main.py 的 run_scrapers() 函数中添加调用
+
+Q: 想看数据库里有多少房源？
+A: 终端执行：
+    python -c "from database import get_listing_count; print('共', get_listing_count(), '条房源')"
+
+
+七、日常维护频率总结
+----------------------------------------
+| 事项               | 频率       | 你要做的                    |
+|--------------------|-----------|---------------------------|
+| 正常使用           | 每天       | 什么都不用做，看钉钉就行     |
+| 豆瓣 Cookie 过期   | 每 2-4 周  | 重新复制 Cookie 更新一下     |
+| 调整偏好/阈值      | 随时       | 改 config.yaml → git push   |
+| 链家/贝壳改版      | 极少       | 联系开发者修复               |
