@@ -1,6 +1,6 @@
 # ============================================
 # 租房助手 - 用户偏好配置
-# 修改后重新运行 main.py 即可生效，无需改代码
+# config.yaml 已被 .gitignore 忽略，不会提交到 Git
 # ============================================
 
 preferences:
@@ -20,29 +20,47 @@ preferences:
   preferred_rooms: []
 
 scrapers:
-  lianjia:
-    enabled: true
-    city: "changchun"
-    request_interval: 5.0
-    max_pages: 5
-  beike:
-    enabled: true
-    city: "changchun"
-    request_interval: 5.0
-    max_pages: 5
   douban:
     enabled: true
     groups:
-      - ["changchunzufang", "长春租房"]
-      - ["cczufang", "长春租房2"]
-    cookie: 'll="118137"; bid=sNATksG9Ols; dbcl2="289707588:guy+VBuv7G0"; ck=jMCc; ap_v=0,6.0; push_noty_num=0; push_doumail_num=0; frodotk_db="52a89155bdf5971af7f9b40139e0c54e"'
+      - ["changchun", "长春豆瓣小组"]
+      - ["308599", "豆瓣租房小组"]
+    cookie: ""
     max_pages: 5
     exclude_keywords:
       - "求租"
+    include_keywords:
+      - "出租"
+      - "租房"
+      - "整租"
+      - "合租"
+      - "转租"
+      - "月租"
+      - "元/月"
+  tieba:
+    enabled: true
+    bars:
+      - "长春租房"
+      - "长春租房吧"
+    max_pages: 5
+    request_interval: 3.0
+    exclude_keywords:
+      - "求租"
+    include_keywords: []
+  xianyu:
+    enabled: true
+    city: "长春"
+    max_pages: 3
+    request_interval: 5.0
+    cookie: "cookie2=1c64fd8aa4ec3754796343f7b5d70fa5; mtop_partitioned_detect=1; _m_h5_tk=48ab7f343862e4f5a7f7cdfe92d39f18_1779183187991; _m_h5_tk_enc=6b4e83cf9019df4cdc23aec2f2179c85; _samesite_flag_=true; t=ee66f23b8d00e83ea75410c2ea63a88a; _tb_token_=e93e3e053e455; tracknick=xy689925663007; unb=2221097370724; sgcookie=E100munTGGeG3afhK2hpF9B1NqJxe0pi5xPPD3XSztq0kk98qpBy3jo2aFhCzjXinDJhyMfuH7hMB5oOYuoGJhIyO5wOxHcG%2BoxHtFeF6Rt%2FhQM%3D; csg=86fe2e0a; havana_lgc2_77=eyJoaWQiOjIyMjEwOTczNzA3MjQsInNnIjoiMDIyMzY1YzQxNDEyYzI0ZjVlMmYzOTVmMzIxMzI5MTQiLCJzaXRlIjo3NywidG9rZW4iOiIxUU1yX1VubzRWT0M5OEVFTmp1NHRMUSJ9; _hvn_lgc_=77; havana_lgc_exp=1781767664785; sdkSilent=1779262067102"
+  mofang:
+    enabled: true
+    city: "长春"
+    request_interval: 3.0
 
 scoring:
   min_score_to_notify: 50
 
 notification:
-  dingtalk_webhook: "https://oapi.dingtalk.com/robot/send?access_token=c194c250e078ca42aa927eac14e84de38742b4b4ab01559441223dba85cbb953"
-  dingtalk_secret: "SECc29b88078e1a745c47b517a4f3268d67fa6faddb080ca0c9b4f684c384acd58e"
+  dingtalk_webhook: ""
+  dingtalk_secret: ""

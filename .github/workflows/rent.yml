@@ -26,6 +26,7 @@ jobs:
       - name: 运行租房助手
         env:
           DOUBAN_COOKIE: ${{ secrets.DOUBAN_COOKIE }}
+          XIANYU_COOKIE: ${{ secrets.XIANYU_COOKIE }}
           DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
           DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
         run: python main.py
