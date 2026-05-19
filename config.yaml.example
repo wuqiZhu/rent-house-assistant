@@ -38,28 +38,21 @@ scrapers:
       - "转租"
       - "月租"
       - "元/月"
-  tieba:
+  inboyu:
     enabled: true
-    bars:
-      - "长春租房"
-      - "长春租房吧"
-    max_pages: 5
+    city: "长春"
     request_interval: 3.0
-    exclude_keywords:
-      - "求租"
-    include_keywords: []
-  xianyu:
+  baletoo:
+    enabled: true
+    cities:
+      - "bj"
+      - "sh"
+    request_interval: 3.0
+  fang:
     enabled: true
     city: "长春"
     max_pages: 3
     request_interval: 5.0
-    # cookie: 从浏览器导出的闲鱼 Cookie（必须配置才能使用）
-    # 导出方法：浏览器打开 goofish.com → F12 → Network → 刷新页面 → 点击请求 → Headers → Cookie
-    cookie: ""
-  mofang:
-    enabled: true
-    city: "长春"
-    request_interval: 3.0
 
 scoring:
   min_score_to_notify: 50

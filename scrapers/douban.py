@@ -3,7 +3,7 @@ import os
 import re
 
 from models import HousingListing
-from scrapers.base import BaseScraper, fetch_page, generate_listing_id
+from scrapers.base import BaseScraper, generate_listing_id
 
 logger = logging.getLogger(__name__)
 
@@ -39,46 +39,111 @@ class DoubanScraper(BaseScraper):
         return "douban"
 
     def fetch_listings(self, city=None):
-        all_listings = []
-        cookies = self._parse_cookie()
+        if not self.cookie:
+            logger.warning("[豆瓣] 未配置Cookie，跳过豆瓣爬取。请设置 DOUBAN_COOKIE 环境变量")
+            return []
 
-        for group_id, group_name in self.groups:
-            logger.info("[豆瓣] 开始爬取小组: %s (%s)", group_name, group_id)
+        all_listings = []
+
+        try:
+            from playwright.sync_api import sync_playwright
+        except ImportError:
+            logger.error("[豆瓣] 未安装playwright，请运行: pip install playwright && playwright install chromium")
+            return []
+
+        cookie_list = self._parse_cookie_to_list()
+
+        pw = None
+        browser = None
+        try:
+            pw = sync_playwright().start()
+            browser = pw.chromium.launch(
+                headless=True,
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    "--no-sandbox",
+                ],
+            )
+            context = browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                locale="zh-CN",
+                viewport={"width": 1920, "height": 1080},
+            )
+            context.add_cookies(cookie_list)
+            page = context.new_page()
+            page.add_init_script("""
+                Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+                window.chrome = {runtime: {}};
+            """)
+
+            for group_id, group_name in self.groups:
+                logger.info("[豆瓣] 开始爬取小组: %s (%s)", group_name, group_id)
+                try:
+                    listings = self._crawl_group_pw(page, group_id, group_name)
+                    all_listings.extend(listings)
+                    logger.info("[豆瓣] %s 获取 %d 条", group_name, len(listings))
+                except Exception as e:
+                    logger.error("[豆瓣] %s 爬取失败: %s", group_name, e)
+
+        except Exception as e:
+            logger.error("[豆瓣] Playwright异常: %s", e)
+        finally:
             try:
-                listings = self._crawl_group(group_id, group_name, cookies)
-                all_listings.extend(listings)
-                logger.info("[豆瓣] %s 获取 %d 条", group_name, len(listings))
-            except Exception as e:
-                logger.error("[豆瓣] %s 爬取失败: %s", group_name, e)
+                if browser:
+                    browser.close()
+            except Exception:
+                pass
+            try:
+                if pw:
+                    pw.stop()
+            except Exception:
+                pass
 
         logger.info("[豆瓣] 共获取 %d 条房源", len(all_listings))
         return all_listings
 
-    def _parse_cookie(self):
-        cookies = {}
+    def _parse_cookie_to_list(self):
+        cookie_list = []
         if not self.cookie:
-            return cookies
+            return cookie_list
         for pair in self.cookie.split(";"):
             pair = pair.strip()
             if "=" in pair:
                 k, v = pair.split("=", 1)
-                cookies[k.strip()] = v.strip().strip('"')
-        return cookies
+                cookie_list.append({
+                    "name": k.strip(),
+                    "value": v.strip().strip('"'),
+                    "domain": ".douban.com",
+                    "path": "/",
+                })
+        return cookie_list
 
-    def _crawl_group(self, group_id, group_name, cookies):
+    def _crawl_group_pw(self, page, group_id, group_name):
+        from bs4 import BeautifulSoup
+
         listings = []
-        for page in range(self.max_pages):
-            start = page * 25
+        for page_num in range(self.max_pages):
+            start = page_num * 25
             url = "https://www.douban.com/group/{}/discussion?start={}&type=new".format(
                 group_id, start
             )
-            logger.info("[豆瓣] %s 第%d页", group_name, page + 1)
+            logger.info("[豆瓣] %s 第%d页", group_name, page_num + 1)
 
             try:
-                soup = fetch_page(url, cookies=cookies)
+                page.goto(url, timeout=30000, wait_until="domcontentloaded")
+                page.wait_for_timeout(2000)
+
+                final_url = page.url
+                if "sec.douban.com" in final_url or "login" in final_url:
+                    logger.warning("[豆瓣] %s Cookie已过期，需要重新登录", group_name)
+                    break
+
+                html = page.content()
+                soup = BeautifulSoup(html, "html.parser")
+
                 table = soup.select_one("table.olt")
                 if not table:
-                    logger.warning("[豆瓣] %s 未找到帖子列表，可能Cookie过期", group_name)
+                    logger.warning("[豆瓣] %s 未找到帖子列表", group_name)
                     break
 
                 rows = table.select("tr")[1:]
@@ -111,11 +176,11 @@ class DoubanScraper(BaseScraper):
                     listings.append(listing)
                     found_any = True
 
-                if not found_any and page > 0:
+                if not found_any and page_num > 0:
                     break
 
             except Exception as e:
-                logger.error("[豆瓣] %s 第%d页失败: %s", group_name, page + 1, e)
+                logger.error("[豆瓣] %s 第%d页失败: %s", group_name, page_num + 1, e)
 
             self._throttle()
 

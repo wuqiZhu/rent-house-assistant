@@ -37,26 +37,21 @@ scrapers:
       - "转租"
       - "月租"
       - "元/月"
-  tieba:
+  inboyu:
     enabled: true
-    bars:
-      - "长春租房"
-      - "长春租房吧"
-    max_pages: 5
+    city: "长春"
     request_interval: 3.0
-    exclude_keywords:
-      - "求租"
-    include_keywords: []
-  xianyu:
+  baletoo:
+    enabled: true
+    cities:
+      - "bj"
+      - "sh"
+    request_interval: 3.0
+  fang:
     enabled: true
     city: "长春"
     max_pages: 3
     request_interval: 5.0
-    cookie: "cookie2=1c64fd8aa4ec3754796343f7b5d70fa5; mtop_partitioned_detect=1; _m_h5_tk=48ab7f343862e4f5a7f7cdfe92d39f18_1779183187991; _m_h5_tk_enc=6b4e83cf9019df4cdc23aec2f2179c85; _samesite_flag_=true; t=ee66f23b8d00e83ea75410c2ea63a88a; _tb_token_=e93e3e053e455; tracknick=xy689925663007; unb=2221097370724; sgcookie=E100munTGGeG3afhK2hpF9B1NqJxe0pi5xPPD3XSztq0kk98qpBy3jo2aFhCzjXinDJhyMfuH7hMB5oOYuoGJhIyO5wOxHcG%2BoxHtFeF6Rt%2FhQM%3D; csg=86fe2e0a; havana_lgc2_77=eyJoaWQiOjIyMjEwOTczNzA3MjQsInNnIjoiMDIyMzY1YzQxNDEyYzI0ZjVlMmYzOTVmMzIxMzI5MTQiLCJzaXRlIjo3NywidG9rZW4iOiIxUU1yX1VubzRWT0M5OEVFTmp1NHRMUSJ9; _hvn_lgc_=77; havana_lgc_exp=1781767664785; sdkSilent=1779262067102"
-  mofang:
-    enabled: true
-    city: "长春"
-    request_interval: 3.0
 
 scoring:
   min_score_to_notify: 50

@@ -23,10 +23,12 @@ jobs:
       - name: 安装依赖
         run: pip install -r requirements.txt
 
+      - name: 安装 Playwright 浏览器
+        run: playwright install chromium --with-deps
+
       - name: 运行租房助手
         env:
           DOUBAN_COOKIE: ${{ secrets.DOUBAN_COOKIE }}
-          XIANYU_COOKIE: ${{ secrets.XIANYU_COOKIE }}
           DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
           DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
         run: python main.py

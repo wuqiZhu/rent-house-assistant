@@ -47,9 +47,9 @@ def build_preferences(cfg):
 
 def run_scrapers(cfg):
     from scrapers.douban import DoubanScraper
-    from scrapers.tieba import TiebaScraper
-    from scrapers.xianyu import XianyuScraper
-    from scrapers.mofang import MofangScraper
+    from scrapers.inboyu import InboyuScraper
+    from scrapers.baletoo import BaletooScraper
+    from scrapers.fang import FangScraper
 
     all_listings = []
     scraper_cfg = cfg.get("scrapers", {})
@@ -70,47 +70,42 @@ def run_scrapers(cfg):
         except Exception as e:
             logger.error("豆瓣爬虫异常: %s", e)
 
-    if scraper_cfg.get("tieba", {}).get("enabled", False):
-        tb_cfg = scraper_cfg["tieba"]
+    if scraper_cfg.get("inboyu", {}).get("enabled", False):
+        ib_cfg = scraper_cfg["inboyu"]
         try:
-            scraper = TiebaScraper(
-                bars=tb_cfg.get("bars", []),
-                max_pages=tb_cfg.get("max_pages", 5),
-                exclude_keywords=tb_cfg.get("exclude_keywords", ["求租"]),
-                include_keywords=tb_cfg.get("include_keywords", []),
-                request_interval=tb_cfg.get("request_interval", 3.0),
+            scraper = InboyuScraper(
+                city=ib_cfg.get("city", "长春"),
+                request_interval=ib_cfg.get("request_interval", 3.0),
             )
             listings = scraper.fetch_listings()
             all_listings.extend(listings)
         except Exception as e:
-            logger.error("贴吧爬虫异常: %s", e)
+            logger.error("泊寓爬虫异常: %s", e)
 
-    if scraper_cfg.get("xianyu", {}).get("enabled", False):
-        xy_cfg = scraper_cfg["xianyu"]
+    if scraper_cfg.get("baletoo", {}).get("enabled", False):
+        bt_cfg = scraper_cfg["baletoo"]
         try:
-            xy_cookie = os.environ.get("XIANYU_COOKIE") or xy_cfg.get("cookie", "")
-            scraper = XianyuScraper(
-                cookie=xy_cookie,
-                city=xy_cfg.get("city", "长春"),
-                max_pages=xy_cfg.get("max_pages", 3),
-                request_interval=xy_cfg.get("request_interval", 5.0),
+            scraper = BaletooScraper(
+                cities=bt_cfg.get("cities", ["bj"]),
+                request_interval=bt_cfg.get("request_interval", 3.0),
             )
             listings = scraper.fetch_listings()
             all_listings.extend(listings)
         except Exception as e:
-            logger.error("闲鱼爬虫异常: %s", e)
+            logger.error("巴乐兔爬虫异常: %s", e)
 
-    if scraper_cfg.get("mofang", {}).get("enabled", False):
-        mf_cfg = scraper_cfg["mofang"]
+    if scraper_cfg.get("fang", {}).get("enabled", False):
+        fg_cfg = scraper_cfg["fang"]
         try:
-            scraper = MofangScraper(
-                city=mf_cfg.get("city", "长春"),
-                request_interval=mf_cfg.get("request_interval", 3.0),
+            scraper = FangScraper(
+                city=fg_cfg.get("city", "长春"),
+                max_pages=fg_cfg.get("max_pages", 3),
+                request_interval=fg_cfg.get("request_interval", 5.0),
             )
             listings = scraper.fetch_listings()
             all_listings.extend(listings)
         except Exception as e:
-            logger.error("魔方公寓爬虫异常: %s", e)
+            logger.error("房天下爬虫异常: %s", e)
 
     return all_listings
 
