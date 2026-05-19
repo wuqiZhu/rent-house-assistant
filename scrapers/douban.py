@@ -62,7 +62,7 @@ class DoubanScraper(BaseScraper):
             pair = pair.strip()
             if "=" in pair:
                 k, v = pair.split("=", 1)
-                cookies[k.strip()] = v.strip()
+                cookies[k.strip()] = v.strip().strip('"')
         return cookies
 
     def _crawl_group(self, group_id, group_name, cookies):
@@ -76,7 +76,6 @@ class DoubanScraper(BaseScraper):
 
             try:
                 soup = fetch_page(url, cookies=cookies)
-
                 table = soup.select_one("table.olt")
                 if not table:
                     logger.warning("[豆瓣] %s 未找到帖子列表，可能Cookie过期", group_name)
@@ -89,17 +88,11 @@ class DoubanScraper(BaseScraper):
                 found_any = False
                 for row in rows:
                     title_el = row.select_one("td.title a")
-                    time_el = row.select_one("td.td-time")
-
                     if not title_el:
                         continue
 
                     title = title_el.get_text(strip=True)
                     link = title_el.get("href", "")
-
-                    pub_time_str = ""
-                    if time_el:
-                        pub_time_str = time_el.get("title", "") or time_el.get_text(strip=True)
 
                     if not self._pass_filter(title):
                         continue
@@ -108,7 +101,7 @@ class DoubanScraper(BaseScraper):
                     area = self._extract_area(title)
 
                     listing = HousingListing(
-                        listing_id=generate_listing_id(link),
+                        listing_id=generate_listing_id(self.source_name, link),
                         source=self.source_name,
                         title=title,
                         price=price if price else 0,

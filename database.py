@@ -31,6 +31,19 @@ CREATE TABLE IF NOT EXISTS listings (
 )
 """
 
+CREATE_INDEX_SQL = [
+    "CREATE INDEX IF NOT EXISTS idx_score_notified ON listings(score, is_notified)",
+    "CREATE INDEX IF NOT EXISTS idx_source ON listings(source)",
+    "CREATE INDEX IF NOT EXISTS idx_crawl_time ON listings(crawl_time)",
+]
+
+ALLOWED_ORDER_BY = {
+    "score DESC", "score ASC",
+    "price DESC", "price ASC",
+    "crawl_time DESC", "crawl_time ASC",
+    "area DESC", "area ASC",
+}
+
 
 @contextmanager
 def get_db(db_path=None):
@@ -45,20 +58,15 @@ def get_db(db_path=None):
 def init_db(db_path=None):
     with get_db(db_path) as conn:
         conn.execute(CREATE_LISTINGS_SQL)
+        for sql in CREATE_INDEX_SQL:
+            conn.execute(sql)
         conn.commit()
     logger.info("数据库初始化完成: %s", db_path or DB_PATH)
 
 
 def save_listing(conn, listing):
-    existing = conn.execute(
-        "SELECT id FROM listings WHERE id = ?", (listing.listing_id,)
-    ).fetchone()
-
-    if existing:
-        return False
-
     conn.execute(
-        """INSERT INTO listings
+        """INSERT OR IGNORE INTO listings
         (id, source, title, price, area, rooms, floor, address, district,
          subway_station, url, description, images, publish_time, crawl_time, score)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -81,17 +89,16 @@ def save_listing(conn, listing):
             listing.score,
         ),
     )
-    return True
 
 
 def save_listings(listings, db_path=None):
-    new_count = 0
     with get_db(db_path) as conn:
+        before = conn.execute("SELECT COUNT(*) FROM listings").fetchone()[0]
         for listing in listings:
-            if save_listing(conn, listing):
-                new_count += 1
+            save_listing(conn, listing)
         conn.commit()
-    return new_count
+        after = conn.execute("SELECT COUNT(*) FROM listings").fetchone()[0]
+    return after - before
 
 
 def get_unnotified_high_score(min_score=80, db_path=None):
@@ -113,9 +120,11 @@ def mark_notified(listing_ids, db_path=None):
 
 
 def get_all_listings(order_by="score DESC", db_path=None):
+    if order_by not in ALLOWED_ORDER_BY:
+        order_by = "score DESC"
     with get_db(db_path) as conn:
         rows = conn.execute(
-            f"SELECT * FROM listings ORDER BY {order_by}"
+            "SELECT * FROM listings ORDER BY {}".format(order_by)
         ).fetchall()
         return [dict(row) for row in rows]
 
@@ -124,3 +133,16 @@ def get_listing_count(db_path=None):
     with get_db(db_path) as conn:
         row = conn.execute("SELECT COUNT(*) FROM listings").fetchone()
         return row[0]
+
+
+def cleanup_old_listings(days=30, db_path=None):
+    with get_db(db_path) as conn:
+        cursor = conn.execute(
+            "DELETE FROM listings WHERE crawl_time < datetime('now', ?)",
+            ("{} days".format(-days),),
+        )
+        conn.commit()
+        deleted = cursor.rowcount
+    if deleted > 0:
+        logger.info("清理了 %d 条超过 %d 天的旧数据", deleted, days)
+    return deleted

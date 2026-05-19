@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 output*.txt
 test_*.py
+config.yaml

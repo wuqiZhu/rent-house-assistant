@@ -1,0 +1,49 @@
+# ============================================
+# 租房助手 - 用户偏好配置
+# 复制此文件为 config.yaml 并填入你的真实配置
+# config.yaml 已被 .gitignore 忽略，不会提交到 Git
+# ============================================
+
+preferences:
+  budget_min: 800
+  budget_max: 1200
+  area_min: 0
+  area_max: 999
+  preferred_districts:
+    - "朝阳区"
+    - "南关区"
+  preferred_subway_stations: []
+  max_commute_minutes: 30
+  workplace_station: "硅谷广场"
+  required_facilities:
+    - "洗衣机"
+    - "独立卫生间"
+  preferred_rooms: []
+
+scrapers:
+  lianjia:
+    enabled: true
+    city: "changchun"
+    request_interval: 5.0
+    max_pages: 5
+  beike:
+    enabled: true
+    city: "changchun"
+    request_interval: 5.0
+    max_pages: 5
+  douban:
+    enabled: true
+    groups:
+      - ["changchunzufang", "长春租房"]
+      - ["cczufang", "长春租房2"]
+    cookie: ""
+    max_pages: 5
+    exclude_keywords:
+      - "求租"
+
+scoring:
+  min_score_to_notify: 50
+
+notification:
+  dingtalk_webhook: ""
+  dingtalk_secret: ""
