@@ -24,22 +24,30 @@ scrapers:
   lianjia:
     enabled: true
     city: "changchun"
-    request_interval: 5.0
+    request_interval: 8.0
     max_pages: 5
   beike:
     enabled: true
     city: "changchun"
-    request_interval: 5.0
+    request_interval: 8.0
     max_pages: 5
   douban:
     enabled: true
     groups:
-      - ["changchunzufang", "长春租房"]
-      - ["cczufang", "长春租房2"]
+      - ["changchun", "长春豆瓣小组"]
+      - ["308599", "豆瓣租房小组"]
     cookie: ""
     max_pages: 5
     exclude_keywords:
       - "求租"
+    include_keywords:
+      - "出租"
+      - "租房"
+      - "整租"
+      - "合租"
+      - "转租"
+      - "月租"
+      - "元/月"
 
 scoring:
   min_score_to_notify: 50

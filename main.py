@@ -3,6 +3,9 @@ import os
 import sys
 from pathlib import Path
 
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 import yaml
 
 from database import get_listing_count, init_db, save_listings, get_unnotified_high_score, mark_notified, cleanup_old_listings
