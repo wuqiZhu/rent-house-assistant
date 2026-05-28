@@ -2,7 +2,7 @@ import logging
 import re
 
 from models import HousingListing
-from scrapers.base import BaseScraper, fetch_page, generate_listing_id
+from scrapers.base import BaseScraper, generate_listing_id
 
 logger = logging.getLogger(__name__)
 
@@ -38,28 +38,55 @@ class InboyuScraper(BaseScraper):
         logger.info("[泊寓] 访问: %s", url)
 
         try:
-            soup = fetch_page(url)
-            listings = self._parse_list_page(soup, city, existing_ids)
-            logger.info("[泊寓] %s 获取 %d 条房源", city, len(listings))
-            return listings
+            from playwright.sync_api import sync_playwright
+            return self._fetch_with_playwright(url, city, existing_ids)
+        except ImportError:
+            logger.error("[泊寓] 未安装playwright，请运行: pip install playwright && playwright install chromium")
+            return []
         except Exception as e:
             logger.error("[泊寓] %s 爬取失败: %s", city, e)
             return []
 
-    def _parse_list_page(self, soup, city_name, existing_ids):
+    def _fetch_with_playwright(self, url, city_name, existing_ids):
+        from playwright.sync_api import sync_playwright
+
         listings = []
+        with sync_playwright() as p:
+            browser = p.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-blink-features=AutomationControlled"],
+            )
+            context = browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                viewport={"width": 1280, "height": 800},
+            )
+            page = context.new_page()
 
-        links = soup.select("a[href*='house-type/detail']")
-        if not links:
-            links = soup.select("a[href*='detail']")
+            try:
+                page.goto(url, timeout=30000, wait_until="networkidle")
+                page.wait_for_timeout(3000)
 
-        for link in links:
-            listing = self._parse_link(link, city_name)
-            if listing:
-                if listing.listing_id in existing_ids:
-                    continue
-                listings.append(listing)
+                html = page.content()
+                from bs4 import BeautifulSoup
+                soup = BeautifulSoup(html, "html.parser")
 
+                links = soup.select("a[href*='house-type/detail']")
+                if not links:
+                    links = soup.select("a[href*='detail']")
+
+                for link in links:
+                    listing = self._parse_link(link, city_name)
+                    if listing:
+                        if listing.listing_id in existing_ids:
+                            continue
+                        listings.append(listing)
+
+            except Exception as e:
+                logger.error("[泊寓] Playwright 抓取失败: %s", e)
+            finally:
+                browser.close()
+
+        logger.info("[泊寓] %s 获取 %d 条房源", city_name, len(listings))
         return listings
 
     def _parse_link(self, link, city_name):
