@@ -7,3 +7,4 @@ config.yaml
 .venv/
 venv_lib/
 deploy/
+ms-playwright/

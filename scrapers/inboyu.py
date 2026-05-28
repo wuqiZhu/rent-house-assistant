@@ -63,8 +63,12 @@ class InboyuScraper(BaseScraper):
             page = context.new_page()
 
             try:
-                page.goto(url, timeout=30000, wait_until="networkidle")
-                page.wait_for_timeout(3000)
+                page.goto(url, timeout=30000, wait_until="domcontentloaded")
+                try:
+                    page.wait_for_selector("a[href*='house-type/detail'], a[href*='detail']", timeout=15000)
+                except Exception as e:
+                    logger.warning("[泊寓] 等待房源列表超时: %s", e)
+                page.wait_for_timeout(2000)
 
                 html = page.content()
                 from bs4 import BeautifulSoup

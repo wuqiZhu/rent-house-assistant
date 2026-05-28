@@ -8,7 +8,7 @@ from scrapers.base import BaseScraper, generate_listing_id
 logger = logging.getLogger(__name__)
 
 FANG_CITY_MAP = {
-    "北京": "bj", "上海": "sh", "广州": "gz", "深圳": "sz",
+    "北京": "", "上海": "sh", "广州": "gz", "深圳": "sz",
     "成都": "cd", "杭州": "hz", "南京": "nj", "武汉": "wh",
     "天津": "tj", "重庆": "cq", "长沙": "cs", "长春": "changchun",
     "厦门": "xm", "西安": "xa", "郑州": "zz", "大连": "dl",
@@ -69,7 +69,10 @@ class FangScraper(BaseScraper):
             all_listings = []
             seen_ids = set()
 
-            base_url = "https://{}.zu.fang.com".format(city_code)
+            if city_code:
+                base_url = "https://{}.zu.fang.com".format(city_code)
+            else:
+                base_url = "https://zu.fang.com"
 
             for page_num in range(1, self.max_pages + 1):
                 if page_num == 1:
@@ -85,10 +88,10 @@ class FangScraper(BaseScraper):
 
                     final_url = page.url
                     if "check" in final_url.lower():
-                        logger.warning("[房天下] 触发验证页面，等待...")
-                        page.wait_for_timeout(5000)
+                        logger.warning("[房天下] 触发验证页面，请在30秒内手动滑动验证码！")
+                        page.wait_for_timeout(30000)
                         if "check" in page.url.lower():
-                            logger.warning("[房天下] 验证未通过，停止翻页")
+                            logger.warning("[房天下] 验证超时未通过，停止翻页")
                             break
 
                     html = page.content()

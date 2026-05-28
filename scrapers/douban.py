@@ -29,6 +29,7 @@ class DoubanScraper(BaseScraper):
         exclude_keywords=None,
         include_keywords=None,
         request_interval=6.0,
+        max_detail_fetches=50,
     ):
         super().__init__(request_interval=request_interval)
         self.groups = groups or DEFAULT_GROUPS
@@ -36,6 +37,8 @@ class DoubanScraper(BaseScraper):
         self.max_pages = max_pages
         self.exclude_keywords = exclude_keywords or ["求租", "合租找室友"]
         self.include_keywords = include_keywords or []
+        self.max_detail_fetches = max_detail_fetches
+        self._detail_fetch_count = 0
 
     @property
     def source_name(self):
@@ -49,6 +52,7 @@ class DoubanScraper(BaseScraper):
             logger.warning("[豆瓣] 未配置Cookie，跳过豆瓣爬取。请设置 DOUBAN_COOKIE 环境变量")
             return []
 
+        self._detail_fetch_count = 0
         all_listings = []
 
         try:
@@ -177,8 +181,40 @@ class DoubanScraper(BaseScraper):
                     if listing_id in existing_ids:
                         continue
 
+                    # Fallback deep fetch content if price or area is missing from title
                     price = self._extract_price(title)
                     area = self._extract_area(title)
+                    rooms = self._extract_rooms(title)
+                    
+                    desc_text = ""
+                    if (not price or not area or not rooms) and self._detail_fetch_count < self.max_detail_fetches:
+                        self._detail_fetch_count += 1
+                        logger.info(f"[豆瓣] 标题缺信息，进入详情页({self._detail_fetch_count}/{self.max_detail_fetches}): {title[:15]}...")
+                        try:
+                            # 详情页防频繁请求风控，进入详情之后稍作等待然后退回/不退回直接新建tab也可以，但新建更稳
+                            detail_page = page.context.new_page()
+                            detail_page.goto(link, timeout=20000, wait_until="domcontentloaded")
+                            detail_page.wait_for_timeout(2000)
+                            
+                            content_el = detail_page.locator("#link-report .topic-content")
+                            if content_el.count() > 0:
+                                desc_text = content_el.inner_text()
+                                
+                                # 在正文中再次寻找
+                                if not price:
+                                    price = self._extract_price(desc_text)
+                                if not area:
+                                    area = self._extract_area(desc_text)
+                                if not rooms:
+                                    rooms = self._extract_rooms(desc_text)
+                            
+                            detail_page.close()
+                        except Exception as e:
+                            logger.error(f"[豆瓣] 爬取详情页失败: {e}")
+                            try:
+                                detail_page.close()
+                            except:
+                                pass
 
                     listing = HousingListing(
                         listing_id=listing_id,
@@ -186,7 +222,9 @@ class DoubanScraper(BaseScraper):
                         title=title,
                         price=price if price else 0,
                         area=area,
+                        rooms=rooms,
                         url=link,
+                        description=desc_text[:200] if desc_text else None
                     )
                     listings.append(listing)
                     found_any = True
@@ -300,3 +338,8 @@ class DoubanScraper(BaseScraper):
     def _extract_area(title):
         m = re.search(r"(\d+(?:\.\d+)?)\s*(?:㎡|平|平米|平方)", title)
         return float(m.group(1)) if m else None
+
+    @staticmethod
+    def _extract_rooms(title):
+        m = re.search(r"([1-9一二三四五六七八九]室[0-9零一二三四五六七八九]厅|[1-9一二三四五六七八九]居室)", title)
+        return m.group(1) if m else None

@@ -36,7 +36,7 @@ def score_listing(listing, prefs):
 
 def _score_price(price, prefs):
     if price <= 0:
-        return 0
+        return WEIGHT_PRICE * 0.5  # 兜底：缺失价格给15分中性分
 
     budget_min = prefs.budget_min
     budget_max = prefs.budget_max

@@ -39,36 +39,65 @@ class BaletooScraper(BaseScraper):
             existing_ids = set()
         all_listings = []
 
-        for city_code in self.cities:
-            city_cn = next((k for k, v in CITY_MAP.items() if v == city_code), city_code)
-            logger.info("[巴乐兔] 开始爬取城市: %s (%s)", city_cn, city_code)
+        try:
+            from playwright.sync_api import sync_playwright
+        except ImportError:
+            logger.error("[巴乐兔] 未安装playwright，请运行: pip install playwright")
+            return []
 
+        pw = None
+        browser = None
+        try:
+            pw = sync_playwright().start()
+            browser = pw.chromium.launch(headless=True, args=["--disable-blink-features=AutomationControlled"])
+            context = browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            )
+            page = context.new_page()
+
+            for city_code in self.cities:
+                city_cn = next((k for k, v in CITY_MAP.items() if v == city_code), city_code)
+                logger.info("[巴乐兔] 开始爬取城市: %s (%s)", city_cn, city_code)
+
+                try:
+                    listings = self._crawl_city_pw(page, city_code, city_cn, existing_ids)
+                    all_listings.extend(listings)
+                    logger.info("[巴乐兔] %s 获取 %d 条房源", city_cn, len(listings))
+                except Exception as e:
+                    logger.error("[巴乐兔] %s 爬取失败: %s", city_cn, e)
+
+        except Exception as e:
+            logger.error("[巴乐兔] Playwright异常: %s", e)
+        finally:
             try:
-                listings = self._crawl_city(city_code, city_cn, existing_ids)
-                all_listings.extend(listings)
-                logger.info("[巴乐兔] %s 获取 %d 条房源", city_cn, len(listings))
-            except Exception as e:
-                logger.error("[巴乐兔] %s 爬取失败: %s", city_cn, e)
+                if browser:
+                    browser.close()
+            except:
+                pass
+            try:
+                if pw:
+                    pw.stop()
+            except:
+                pass
 
         logger.info("[巴乐兔] 共获取 %d 条房源", len(all_listings))
         return all_listings
 
-    def _crawl_city(self, city_code, city_name, existing_ids):
+    def _crawl_city_pw(self, page, city_code, city_name, existing_ids):
         url = "http://{}.baletu.com/".format(city_code)
         logger.info("[巴乐兔] 访问: %s", url)
 
         try:
-            resp = requests.get(
-                url,
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                    "Accept-Language": "zh-CN,zh;q=0.9",
-                },
-                timeout=15,
-            )
-            resp.encoding = "utf-8"
-            soup = BeautifulSoup(resp.text, "html.parser")
+            page.goto(url, timeout=30000, wait_until="domcontentloaded")
+            try:
+                page.wait_for_selector("a[href*='house']", timeout=10000)
+            except:
+                logger.warning(f"[巴乐兔] 未提取到 {city_name} 列表元素，可能无房源")
+            page.wait_for_timeout(2000)
+            html = page.content()
+            
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(html, "html.parser")
         except Exception as e:
             logger.error("[巴乐兔] 请求失败: %s", e)
             return []
