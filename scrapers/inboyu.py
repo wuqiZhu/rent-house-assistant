@@ -87,6 +87,9 @@ class InboyuScraper(BaseScraper):
                 links = soup.select("a[href*='house-type/detail']")
                 if not links:
                     links = soup.select("a[href*='detail']")
+                    
+                if links and len(links) > 0:
+                    logger.info("[泊寓] 成功获取 %d 个候选连接节点...", len(links))
 
                 for link in links:
                     listing = self._parse_link(link, city_name)
@@ -94,6 +97,14 @@ class InboyuScraper(BaseScraper):
                         if listing.listing_id in existing_ids:
                             continue
                         listings.append(listing)
+                
+                # 如果没抓到任何数据，截个图看看实际画面
+                if len(listings) == 0:
+                    logger.warning("[泊寓] 抓取总数为 0，截取一张 inboyu_zero.png 用于排查数据是否被隐藏")
+                    try:
+                        page.screenshot(path="inboyu_zero.png")
+                    except:
+                        pass
 
             except Exception as e:
                 logger.error("[泊寓] Playwright 抓取失败: %s", e)

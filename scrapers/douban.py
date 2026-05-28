@@ -159,7 +159,12 @@ class DoubanScraper(BaseScraper):
 
                 table = soup.select_one("table.olt")
                 if not table:
-                    logger.warning("[豆瓣] %s 未找到帖子列表", group_name)
+                    # 有些豆瓣新版页面或者被封控会导致没有 table.olt，尝试新的排版或留底排查
+                    logger.warning("[豆瓣] %s 未找到帖子列表 (table.olt)，可能是排版更新或者需要权限", group_name)
+                    try:
+                        page.screenshot(path=f"douban_error_{group_id}.png")
+                    except:
+                        pass
                     break
 
                 rows = table.select("tr")[1:]
