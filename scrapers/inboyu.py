@@ -91,7 +91,9 @@ class InboyuScraper(BaseScraper):
                 if links and len(links) > 0:
                     logger.info("[泊寓] 成功获取 %d 个候选连接节点...", len(links))
 
-                for link in links:
+                for i, link in enumerate(links):
+                    link_text = link.get_text(" ", strip=True)
+                    logger.info(f"[泊寓] 链接{i}: {link_text[:80]}")
                     listing = self._parse_link(link, city_name)
                     if listing:
                         if listing.listing_id in existing_ids:
@@ -141,7 +143,7 @@ class InboyuScraper(BaseScraper):
             address = addr_match.group(1).strip()
 
         price = 0.0
-        price_match = re.search(r"(\d+(?:\.\d+)?)\s*元/月", text)
+        price_match = re.search(r"(\d+(?:\.\d+)?)\s*元/月(?:起)?", text)
         if price_match:
             price = float(price_match.group(1))
 

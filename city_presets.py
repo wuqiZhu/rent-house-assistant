@@ -8,7 +8,6 @@ CITY_PRESETS = {
             ("beijingzufang", "北京租房"),
             ("549574", "北京租房2"),
             ("596202", "北京租房3"),
-            ("hdzufang", "北京海淀租房"),
         ],
         "inboyu": "北京",
         "baletoo": ["bj"],
