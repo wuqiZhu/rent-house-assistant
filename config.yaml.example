@@ -45,18 +45,19 @@ scrapers:
       - "转租"
       - "月租"
       - "元/月"
+      - "直租"
   inboyu:
     enabled: true
     city: "长春"
     request_interval: 3.0
   baletoo:
-    enabled: true
+    enabled: false
     cities:
       - "bj"
       - "sh"
     request_interval: 3.0
   fang:
-    enabled: true
+    enabled: false
     city: "长春"
     max_pages: 3
     request_interval: 5.0
