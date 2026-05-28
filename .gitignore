@@ -6,5 +6,7 @@ test_*.py
 config.yaml
 .venv/
 venv_lib/
-deploy/
 ms-playwright/
+inboyu_zero.png
+inboyu_error.png
+douban_error*.png

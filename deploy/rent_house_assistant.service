@@ -1,0 +1,16 @@
+[Unit]
+Description=Rent House Assistant - Real Estate Crawler and Notifier
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/rent_house_assistant
+ExecStart=/opt/rent_house_assistant/venv/bin/python main.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/var/log/rent_assistant.log
+StandardError=append:/var/log/rent_assistant.log
+
+[Install]
+WantedBy=multi-user.target

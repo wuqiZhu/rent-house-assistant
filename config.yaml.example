@@ -68,3 +68,12 @@ scoring:
 notification:
   dingtalk_webhook: ""
   dingtalk_secret: ""
+
+# ========== 定时任务配置 ==========
+# 若启用，则程序将作为守护进程持续运行，在指定时间自动执行
+# 若禁用，则运行一次后自动退出（适合 crontab 定时调用）
+schedule:
+  enabled: false
+  morning_hour: 8
+  evening_hour: 20
+  check_interval_seconds: 60

@@ -93,7 +93,7 @@ class InboyuScraper(BaseScraper):
 
                 for i, link in enumerate(links):
                     link_text = link.get_text(" ", strip=True)
-                    logger.info(f"[泊寓] 链接{i}: {link_text[:80]}")
+                    logger.debug(f"[泊寓] 链接{i}: {link_text[:80]}")
                     listing = self._parse_link(link, city_name)
                     if listing:
                         if listing.listing_id in existing_ids:
@@ -126,13 +126,15 @@ class InboyuScraper(BaseScraper):
         if not href.startswith("http"):
             href = INBOYU_BASE + href
 
-        logger.info(f"[泊寓解析] 原始文本: {text}")
+        logger.debug(f"[泊寓解析] 原始文本: {text}")
 
         title_match = re.search(r"(泊寓[^\d]*?店)", text)
         if not title_match:
             title_match = re.search(r"([^\d]+?)(?:\d+个户型)", text)
+        if not title_match:
+            title_match = re.search(r"([^\d]*?泊寓[^\d]*?)", text)
         title = title_match.group(1).strip() if title_match else text[:30]
-        logger.info(f"[泊寓解析] 标题: {title}")
+        logger.debug(f"[泊寓解析] 标题: {title}")
 
         if not title or len(title) < 3:
             logger.warning(f"[泊寓解析] 标题过短，跳过")
@@ -140,38 +142,43 @@ class InboyuScraper(BaseScraper):
 
         rooms_match = re.search(r"(\d+)个户型", text)
         rooms = rooms_match.group(1) if rooms_match else ""
-        logger.info(f"[泊寓解析] 户型数: {rooms}")
+        logger.debug(f"[泊寓解析] 户型数: {rooms}")
 
         address = ""
-        addr_match = re.search(r"户型(.+?)(?:\d+\.?\d*元)", text)
+        addr_match = re.search(r"户型(.+?)(?:\d+\.?\d*\s*元)", text)
         if addr_match:
             address = addr_match.group(1).strip()
-        logger.info(f"[泊寓解析] 地址: {address}")
+        logger.debug(f"[泊寓解析] 地址: {address}")
 
         price = 0.0
         price_match = re.search(r"(\d+(?:\.\d+)?)\s*元/月(?:起)?", text)
+        if not price_match:
+            price_match = re.search(r"(\d+(?:\.\d+)?)\s*-\s*\d+(?:\.\d+)?\s*元/月", text)
         if price_match:
             price = float(price_match.group(1))
-        logger.info(f"[泊寓解析] 价格: {price}")
+        logger.debug(f"[泊寓解析] 价格: {price}")
 
         area = None
-        area_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:㎡|平米|m2)", text)
+        area_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:㎡|平米|m2|m\s*2)", text)
         if area_match:
             area = float(area_match.group(1))
-        logger.info(f"[泊寓解析] 面积: {area}")
+        logger.debug(f"[泊寓解析] 面积: {area}")
 
         district = city_name
         if address:
-            for d in ["朝阳区", "南关区", "宽城区", "二道区", "绿园区",
+            for d in ["朝阳区", "海淀区", "丰台区", "大兴区", "顺义区",
+                      "通州区", "房山区", "门头沟区", "石景山区", "昌平区",
+                      "平谷区", "怀柔区", "密云区", "延庆区", "东城区", "西城区",
+                      "南关区", "宽城区", "二道区", "绿园区",
                        "净月区", "高新区", "经开区", "汽车区"]:
                 if d in address:
                     district = d
                     break
-        logger.info(f"[泊寓解析] 区域: {district}")
+        logger.debug(f"[泊寓解析] 区域: {district}")
 
         listing_id = generate_listing_id(self.source_name, href)
 
-        logger.info(f"[泊寓解析] 解析成功: {title} | {price}元 | {area}㎡ | {district}")
+        logger.debug(f"[泊寓解析] 解析成功: {title} | {price}元 | {area}㎡ | {district}")
 
         return HousingListing(
             listing_id=listing_id,

@@ -1,0 +1,3 @@
+# crontab 示例：每 30 分钟运行一次
+# 编辑 crontab: crontab -e
+*/30 * * * * cd /home/youruser/rent_house/rent_house_assistant && /home/youruser/rent_house/rent_house_assistant/.venv/bin/python main.py >> /var/log/rent_house_assistant.log 2>&1
