@@ -1,9 +1,12 @@
 import logging
 import os
 import re
+import yaml
+from pathlib import Path
 
 from models import HousingListing
 from scrapers.base import BaseScraper, generate_listing_id
+from notifier import upload_image_to_smms, send_dingtalk_raw_markdown
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +41,10 @@ class DoubanScraper(BaseScraper):
     def source_name(self):
         return "douban"
 
-    def fetch_listings(self, city=None):
+    def fetch_listings(self, city=None, existing_ids=None):
+        if existing_ids is None:
+            existing_ids = set()
+
         if not self.cookie:
             logger.warning("[豆瓣] 未配置Cookie，跳过豆瓣爬取。请设置 DOUBAN_COOKIE 环境变量")
             return []
@@ -79,7 +85,7 @@ class DoubanScraper(BaseScraper):
             for group_id, group_name in self.groups:
                 logger.info("[豆瓣] 开始爬取小组: %s (%s)", group_name, group_id)
                 try:
-                    listings = self._crawl_group_pw(page, group_id, group_name)
+                    listings = self._crawl_group_pw(page, group_id, group_name, existing_ids)
                     all_listings.extend(listings)
                     logger.info("[豆瓣] %s 获取 %d 条", group_name, len(listings))
                 except Exception as e:
@@ -118,7 +124,7 @@ class DoubanScraper(BaseScraper):
                 })
         return cookie_list
 
-    def _crawl_group_pw(self, page, group_id, group_name):
+    def _crawl_group_pw(self, page, group_id, group_name, existing_ids):
         from bs4 import BeautifulSoup
 
         listings = []
@@ -135,10 +141,14 @@ class DoubanScraper(BaseScraper):
 
                 final_url = page.url
                 if "sec.douban.com" in final_url or "login" in final_url:
-                    logger.warning("[豆瓣] %s Cookie已过期，需要重新登录", group_name)
-                    break
-
-                html = page.content()
+                    logger.warning("[豆瓣] %s Cookie已过期，触发自动续期流程", group_name)
+                    self._handle_cookie_renewal(page)
+                    # 重新刷新当前页尝试
+                    page.goto(url, timeout=30000, wait_until="domcontentloaded")
+                    page.wait_for_timeout(2000)
+                    html = page.content()
+                else:
+                    html = page.content()
                 soup = BeautifulSoup(html, "html.parser")
 
                 table = soup.select_one("table.olt")
@@ -161,12 +171,17 @@ class DoubanScraper(BaseScraper):
 
                     if not self._pass_filter(title):
                         continue
+                        
+                    # 前置去重校验
+                    listing_id = generate_listing_id(self.source_name, link)
+                    if listing_id in existing_ids:
+                        continue
 
                     price = self._extract_price(title)
                     area = self._extract_area(title)
 
                     listing = HousingListing(
-                        listing_id=generate_listing_id(self.source_name, link),
+                        listing_id=listing_id,
                         source=self.source_name,
                         title=title,
                         price=price if price else 0,
@@ -185,6 +200,71 @@ class DoubanScraper(BaseScraper):
             self._throttle()
 
         return listings
+
+    def _handle_cookie_renewal(self, page):
+        """自动续约 Cookie 的交互式修复流程"""
+        try:
+            # 找到二维码元素
+            qr_element = page.locator(".qcode-img")
+            if qr_element.count() == 0:
+                 # 可能处于普通账号密码输入页面，尝试切换到扫码页面(如果需要的话，或者报错退出)
+                 logger.error("[豆瓣] 未在登录页面找到二维码元素")
+                 return
+            
+            qr_path = "douban_qr.png"
+            qr_element.screenshot(path=qr_path)
+            logger.info("[豆瓣] 已生成登录二维码图片: %s", qr_path)
+            
+            # 借助 SM.MS 等 API 转换为公开 URL
+            qr_url = upload_image_to_smms(qr_path)
+            if qr_url:
+                text = f"### ⚠️ 豆瓣 Cookie 已过期\n\n请在 **3 分钟内** 打开豆瓣 App 扫码登录续期:\n\n![二维码]({qr_url})"
+                send_dingtalk_raw_markdown(text)
+            else:
+                logger.error("[豆瓣] 无法上传二维码到图床")
+                return
+
+            logger.info("[豆瓣] 正在等待扫码 (最长3分钟)...")
+            import time
+            wait_time = 0
+            timeout = 180
+            while wait_time < timeout:
+                page.wait_for_timeout(3000)
+                wait_time += 3
+                # 检查URL是否已经跳离登录页
+                if "sec.douban.com" not in page.url and "login" not in page.url and "accounts.douban.com" not in page.url:
+                    logger.info("[豆瓣] 🎉 扫码成功！正在提取新 Cookie...")
+                    # 扫码成功后，豆瓣会通过 JS 重定向回主页面，拿到新的 cookies
+                    new_cookies = page.context.cookies()
+                    cookie_str = "; ".join([f"{c['name']}={c['value']}" for c in new_cookies])
+                    self.cookie = cookie_str
+                    self._update_cookie_in_config(cookie_str)
+                    return
+            
+            logger.error("[豆瓣] 扫码超时")
+            
+        except Exception as e:
+            logger.error("[豆瓣] 自动续期出错: %s", e)
+
+    def _update_cookie_in_config(self, cookie_str):
+        """将新获取的Cookie回写到config.yaml"""
+        config_path = Path(__file__).parent.parent / "config.yaml"
+        if not config_path.exists():
+            return
+            
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+                
+            if "scrapers" in data and "douban" in data["scrapers"]:
+                data["scrapers"]["douban"]["cookie"] = cookie_str
+                
+            with open(config_path, "w", encoding="utf-8") as f:
+                yaml.dump(data, f, allow_unicode=True, sort_keys=False)
+                
+            logger.info("[豆瓣] 配置文件已更新新 Cookie")
+        except Exception as e:
+            logger.error("[豆瓣] 回写 config.yaml 失败: %s", e)
 
     def _pass_filter(self, title):
         for kw in self.exclude_keywords:

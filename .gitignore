@@ -4,3 +4,6 @@ __pycache__/
 output*.txt
 test_*.py
 config.yaml
+.venv/
+venv_lib/
+deploy/

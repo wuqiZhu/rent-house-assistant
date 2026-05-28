@@ -34,7 +34,9 @@ class BaletooScraper(BaseScraper):
     def source_name(self):
         return "baletoo"
 
-    def fetch_listings(self, city=None):
+    def fetch_listings(self, city=None, existing_ids=None):
+        if existing_ids is None:
+            existing_ids = set()
         all_listings = []
 
         for city_code in self.cities:
@@ -42,7 +44,7 @@ class BaletooScraper(BaseScraper):
             logger.info("[巴乐兔] 开始爬取城市: %s (%s)", city_cn, city_code)
 
             try:
-                listings = self._crawl_city(city_code, city_cn)
+                listings = self._crawl_city(city_code, city_cn, existing_ids)
                 all_listings.extend(listings)
                 logger.info("[巴乐兔] %s 获取 %d 条房源", city_cn, len(listings))
             except Exception as e:
@@ -51,7 +53,7 @@ class BaletooScraper(BaseScraper):
         logger.info("[巴乐兔] 共获取 %d 条房源", len(all_listings))
         return all_listings
 
-    def _crawl_city(self, city_code, city_name):
+    def _crawl_city(self, city_code, city_name, existing_ids):
         url = "http://{}.baletu.com/".format(city_code)
         logger.info("[巴乐兔] 访问: %s", url)
 
@@ -90,6 +92,10 @@ class BaletooScraper(BaseScraper):
             if not href.startswith("http"):
                 href = "http://{}{}".format(city_code + ".baletu.com", href) if href.startswith("//") else "http://{}{}".format(city_code + ".baletu.com", href)
 
+            listing_id = generate_listing_id(self.source_name, href)
+            if listing_id in existing_ids:
+                continue
+
             parent = a.parent
             parent_text = parent.get_text(" ", strip=True) if parent else ""
 
@@ -104,7 +110,7 @@ class BaletooScraper(BaseScraper):
                 area = float(area_match.group(1))
 
             listing = HousingListing(
-                listing_id=generate_listing_id(self.source_name, href),
+                listing_id=listing_id,
                 source=self.source_name,
                 title=text,
                 price=price,

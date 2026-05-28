@@ -40,7 +40,9 @@ class FangScraper(BaseScraper):
     def source_name(self):
         return "fang"
 
-    def fetch_listings(self, city=None):
+    def fetch_listings(self, city=None, existing_ids=None):
+        if existing_ids is None:
+            existing_ids = set()
         city = city or self.city
         city_code = FANG_CITY_MAP.get(city, city)
         logger.info("[房天下] 开始爬取城市: %s (%s)", city, city_code)
@@ -90,7 +92,7 @@ class FangScraper(BaseScraper):
                             break
 
                     html = page.content()
-                    listings = self._parse_html(html, city, base_url)
+                    listings = self._parse_html(html, city, existing_ids, base_url)
 
                     new_count = 0
                     for l in listings:
@@ -129,7 +131,7 @@ class FangScraper(BaseScraper):
             except Exception:
                 pass
 
-    def _parse_html(self, html, city_name, base_url=""):
+    def _parse_html(self, html, city_name, existing_ids, base_url=""):
         from bs4 import BeautifulSoup
 
         soup = BeautifulSoup(html, "html.parser")
@@ -143,6 +145,8 @@ class FangScraper(BaseScraper):
         for item in items:
             listing = self._parse_item(item, city_name, base_url)
             if listing:
+                if listing.listing_id in existing_ids:
+                    continue
                 listings.append(listing)
 
         return listings

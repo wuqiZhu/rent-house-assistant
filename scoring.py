@@ -5,10 +5,22 @@ from models import HousingListing, UserPreferences
 logger = logging.getLogger(__name__)
 
 WEIGHT_PRICE = 30
-WEIGHT_AREA = 20
+WEIGHT_AREA = 15
 WEIGHT_LOCATION = 20
 WEIGHT_COMMUTE = 15
-WEIGHT_FACILITIES = 15
+WEIGHT_FACILITIES = 10
+WEIGHT_QUIET = 10
+
+QUIET_KEYWORDS = [
+    "安静", "低噪", "不临街", "远离马路", "小区内", "独栋",
+    "隔音", "隔音好", "噪音小", "噪声小", "环境安静",
+    "不吵", "清静", "远离高速", "远离铁路", "中间楼层",
+]
+
+DEAL_KEYWORDS = [
+    "优惠", "特价", "降价", "性价比", "便宜", "低价",
+    "急租", "甩租", "亏本", "补贴", "免中介费", "无中介",
+]
 
 
 def score_listing(listing, prefs):
@@ -18,6 +30,7 @@ def score_listing(listing, prefs):
     total += _score_location(listing, prefs)
     total += _score_commute(listing, prefs)
     total += _score_facilities(listing, prefs)
+    total += _score_quiet(listing)
     return round(min(total, 100), 1)
 
 
@@ -27,23 +40,19 @@ def _score_price(price, prefs):
 
     budget_min = prefs.budget_min
     budget_max = prefs.budget_max
-    budget_mid = (budget_min + budget_max) / 2
 
-    if budget_min <= price <= budget_max:
-        distance = abs(price - budget_mid) / (budget_max - budget_min + 1) * 2
-        return WEIGHT_PRICE * (1 - distance * 0.3)
+    if price <= budget_min:
+        return WEIGHT_PRICE
 
-    if price < budget_min:
-        ratio = price / budget_min
-        if ratio >= 0.7:
-            return WEIGHT_PRICE * 0.85
-        return WEIGHT_PRICE * ratio
+    if price <= budget_max:
+        ratio = (price - budget_min) / (budget_max - budget_min + 1)
+        return WEIGHT_PRICE * (1 - ratio * 0.4)
 
     over_ratio = (price - budget_max) / budget_max
     if over_ratio <= 0.1:
-        return WEIGHT_PRICE * 0.6
+        return WEIGHT_PRICE * 0.5
     if over_ratio <= 0.3:
-        return WEIGHT_PRICE * 0.3
+        return WEIGHT_PRICE * 0.25
     return max(0, WEIGHT_PRICE * 0.1)
 
 
@@ -128,6 +137,27 @@ def _score_facilities(listing, prefs):
     if ratio > 0:
         return WEIGHT_FACILITIES * 0.4
     return WEIGHT_FACILITIES * 0.2
+
+
+def _score_quiet(listing):
+    text = "{} {} {}".format(
+        listing.title or "", listing.description or "", listing.address or ""
+    )
+
+    quiet_hits = sum(1 for kw in QUIET_KEYWORDS if kw in text)
+    deal_hits = sum(1 for kw in DEAL_KEYWORDS if kw in text)
+
+    score = 0.0
+
+    if quiet_hits >= 2:
+        score += WEIGHT_QUIET * 0.7
+    elif quiet_hits >= 1:
+        score += WEIGHT_QUIET * 0.4
+
+    if deal_hits >= 1:
+        score += WEIGHT_QUIET * 0.3
+
+    return min(score, WEIGHT_QUIET)
 
 
 def score_all(listings, prefs):

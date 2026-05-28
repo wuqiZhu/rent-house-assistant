@@ -1,5 +1,6 @@
 import logging
 import sqlite3
+import threading
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -8,6 +9,7 @@ from models import HousingListing
 logger = logging.getLogger(__name__)
 
 DB_PATH = Path(__file__).parent / "rent_assistant.db"
+DB_LOCK = threading.Lock()
 
 CREATE_LISTINGS_SQL = """
 CREATE TABLE IF NOT EXISTS listings (
@@ -92,13 +94,14 @@ def save_listing(conn, listing):
 
 
 def save_listings(listings, db_path=None):
-    with get_db(db_path) as conn:
-        before = conn.execute("SELECT COUNT(*) FROM listings").fetchone()[0]
-        for listing in listings:
-            save_listing(conn, listing)
-        conn.commit()
-        after = conn.execute("SELECT COUNT(*) FROM listings").fetchone()[0]
-    return after - before
+    with DB_LOCK:
+        with get_db(db_path) as conn:
+            before = conn.execute("SELECT COUNT(*) FROM listings").fetchone()[0]
+            for listing in listings:
+                save_listing(conn, listing)
+            conn.commit()
+            after = conn.execute("SELECT COUNT(*) FROM listings").fetchone()[0]
+        return after - before
 
 
 def get_unnotified_high_score(min_score=80, db_path=None):
@@ -133,6 +136,13 @@ def get_listing_count(db_path=None):
     with get_db(db_path) as conn:
         row = conn.execute("SELECT COUNT(*) FROM listings").fetchone()
         return row[0]
+
+
+def get_all_ids(db_path=None):
+    """获取数据库中所有房源ID，用于爬虫前置去重"""
+    with get_db(db_path) as conn:
+        rows = conn.execute("SELECT id FROM listings").fetchall()
+        return {row[0] for row in rows}
 
 
 def cleanup_old_listings(days=30, db_path=None):

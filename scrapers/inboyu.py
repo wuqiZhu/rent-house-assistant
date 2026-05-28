@@ -27,7 +27,9 @@ class InboyuScraper(BaseScraper):
     def source_name(self):
         return "inboyu"
 
-    def fetch_listings(self, city=None):
+    def fetch_listings(self, city=None, existing_ids=None):
+        if existing_ids is None:
+            existing_ids = set()
         city = city or self.city
         city_code = CITY_MAP.get(city, city)
         logger.info("[泊寓] 开始爬取城市: %s (%s)", city, city_code)
@@ -37,14 +39,14 @@ class InboyuScraper(BaseScraper):
 
         try:
             soup = fetch_page(url)
-            listings = self._parse_list_page(soup, city)
+            listings = self._parse_list_page(soup, city, existing_ids)
             logger.info("[泊寓] %s 获取 %d 条房源", city, len(listings))
             return listings
         except Exception as e:
             logger.error("[泊寓] %s 爬取失败: %s", city, e)
             return []
 
-    def _parse_list_page(self, soup, city_name):
+    def _parse_list_page(self, soup, city_name, existing_ids):
         listings = []
 
         links = soup.select("a[href*='house-type/detail']")
@@ -54,6 +56,8 @@ class InboyuScraper(BaseScraper):
         for link in links:
             listing = self._parse_link(link, city_name)
             if listing:
+                if listing.listing_id in existing_ids:
+                    continue
                 listings.append(listing)
 
         return listings

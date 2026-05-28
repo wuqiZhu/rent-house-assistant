@@ -175,7 +175,7 @@ class BaseScraper(ABC):
         ...
 
     @abstractmethod
-    def fetch_listings(self, city=None):
+    def fetch_listings(self, city=None, existing_ids=None):
         ...
 
     def _throttle(self):

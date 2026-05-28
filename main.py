@@ -6,9 +6,14 @@ from pathlib import Path
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+_venv_lib = Path(__file__).parent / "venv_lib"
+if _venv_lib.exists() and str(_venv_lib) not in sys.path:
+    sys.path.insert(0, str(_venv_lib))
+
 import yaml
 
-from database import get_listing_count, init_db, save_listings, get_unnotified_high_score, mark_notified, cleanup_old_listings
+from city_presets import apply_city_preset, list_supported_cities
+from database import get_listing_count, init_db, save_listings, get_unnotified_high_score, mark_notified, cleanup_old_listings, get_all_ids
 from models import UserPreferences
 from notifier import send_dingtalk
 from scoring import score_all
@@ -45,7 +50,11 @@ def build_preferences(cfg):
     )
 
 
-def run_scrapers(cfg):
+def run_scrapers(cfg, existing_ids=None):
+    if existing_ids is None:
+        existing_ids = set()
+
+    import concurrent.futures
     from scrapers.douban import DoubanScraper
     from scrapers.inboyu import InboyuScraper
     from scrapers.baletoo import BaletooScraper
@@ -54,7 +63,8 @@ def run_scrapers(cfg):
     all_listings = []
     scraper_cfg = cfg.get("scrapers", {})
 
-    if scraper_cfg.get("douban", {}).get("enabled", False):
+    def run_douban():
+        if not scraper_cfg.get("douban", {}).get("enabled", False): return []
         db_cfg = scraper_cfg["douban"]
         try:
             cookie = os.environ.get("DOUBAN_COOKIE") or db_cfg.get("cookie", "")
@@ -65,36 +75,39 @@ def run_scrapers(cfg):
                 exclude_keywords=db_cfg.get("exclude_keywords", ["求租"]),
                 include_keywords=db_cfg.get("include_keywords", []),
             )
-            listings = scraper.fetch_listings()
-            all_listings.extend(listings)
+            return scraper.fetch_listings(existing_ids=existing_ids)
         except Exception as e:
             logger.error("豆瓣爬虫异常: %s", e)
+            return []
 
-    if scraper_cfg.get("inboyu", {}).get("enabled", False):
+    def run_inboyu():
+        if not scraper_cfg.get("inboyu", {}).get("enabled", False): return []
         ib_cfg = scraper_cfg["inboyu"]
         try:
             scraper = InboyuScraper(
                 city=ib_cfg.get("city", "长春"),
                 request_interval=ib_cfg.get("request_interval", 3.0),
             )
-            listings = scraper.fetch_listings()
-            all_listings.extend(listings)
+            return scraper.fetch_listings(existing_ids=existing_ids)
         except Exception as e:
             logger.error("泊寓爬虫异常: %s", e)
+            return []
 
-    if scraper_cfg.get("baletoo", {}).get("enabled", False):
+    def run_baletoo():
+        if not scraper_cfg.get("baletoo", {}).get("enabled", False): return []
         bt_cfg = scraper_cfg["baletoo"]
         try:
             scraper = BaletooScraper(
                 cities=bt_cfg.get("cities", ["bj"]),
                 request_interval=bt_cfg.get("request_interval", 3.0),
             )
-            listings = scraper.fetch_listings()
-            all_listings.extend(listings)
+            return scraper.fetch_listings(existing_ids=existing_ids)
         except Exception as e:
             logger.error("巴乐兔爬虫异常: %s", e)
+            return []
 
-    if scraper_cfg.get("fang", {}).get("enabled", False):
+    def run_fang():
+        if not scraper_cfg.get("fang", {}).get("enabled", False): return []
         fg_cfg = scraper_cfg["fang"]
         try:
             scraper = FangScraper(
@@ -102,10 +115,22 @@ def run_scrapers(cfg):
                 max_pages=fg_cfg.get("max_pages", 3),
                 request_interval=fg_cfg.get("request_interval", 5.0),
             )
-            listings = scraper.fetch_listings()
-            all_listings.extend(listings)
+            return scraper.fetch_listings(existing_ids=existing_ids)
         except Exception as e:
             logger.error("房天下爬虫异常: %s", e)
+            return []
+
+    tasks = [run_douban, run_inboyu, run_baletoo, run_fang]
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        futures = [executor.submit(task) for task in tasks]
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                listings = future.result()
+                if listings:
+                    all_listings.extend(listings)
+            except Exception as e:
+                logger.error("爬虫执行线程异常: %s", e)
 
     return all_listings
 
@@ -117,22 +142,26 @@ def main():
 
     try:
         cfg = load_config()
+        cfg = apply_city_preset(cfg)
         prefs = build_preferences(cfg)
         init_db()
 
         cleanup_old_listings(days=30)
 
         existing_count = get_listing_count()
-        logger.info("数据库已有 %d 条房源", existing_count)
+        city = cfg.get("city", "未设置")
+        logger.info("数据库已有 %d 条房源 | 当前城市: %s", existing_count, city)
         logger.info("当前偏好: 预算 %d-%d元 | 区域 %s | 工作站: %s",
                     prefs.budget_min, prefs.budget_max,
                     ",".join(prefs.preferred_districts) or "不限",
                     prefs.workplace_station or "未设置")
 
         logger.info("")
-        logger.info("Step 1: 抓取房源数据...")
-        all_listings = run_scrapers(cfg)
-        logger.info("共抓取 %d 条房源", len(all_listings))
+        logger.info("Step 1: 抓取房源数据 (并发模式)...")
+        existing_ids = get_all_ids()
+        logger.info("已加载 %d 条已有房源 ID 到内存布隆池用于急速去重", len(existing_ids))
+        all_listings = run_scrapers(cfg, existing_ids=existing_ids)
+        logger.info("共抓取 %d 条新房源", len(all_listings))
 
         if not all_listings:
             logger.warning("未抓取到任何房源")
