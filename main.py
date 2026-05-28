@@ -50,7 +50,7 @@ def build_preferences(cfg):
     )
 
 
-def run_scrapers(cfg, existing_ids=None):
+def run_scrapers(cfg, existing_ids=None, prefs=None):
     if existing_ids is None:
         existing_ids = set()
 
@@ -74,6 +74,7 @@ def run_scrapers(cfg, existing_ids=None):
                 max_pages=db_cfg.get("max_pages", 3),
                 exclude_keywords=db_cfg.get("exclude_keywords", ["求租"]),
                 include_keywords=db_cfg.get("include_keywords", []),
+                prefs=prefs,
             )
             return scraper.fetch_listings(existing_ids=existing_ids)
         except Exception as e:
@@ -160,7 +161,7 @@ def main():
         logger.info("Step 1: 抓取房源数据 (并发模式)...")
         existing_ids = get_all_ids()
         logger.info("已加载 %d 条已有房源 ID 到内存布隆池用于急速去重", len(existing_ids))
-        all_listings = run_scrapers(cfg, existing_ids=existing_ids)
+        all_listings = run_scrapers(cfg, existing_ids=existing_ids, prefs=prefs)
         logger.info("共抓取 %d 条新房源", len(all_listings))
 
         if not all_listings:

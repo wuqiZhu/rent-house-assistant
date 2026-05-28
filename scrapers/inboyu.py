@@ -61,13 +61,23 @@ class InboyuScraper(BaseScraper):
                 viewport={"width": 1280, "height": 800},
             )
             page = context.new_page()
+            page.add_init_script("""
+                Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+                Object.defineProperty(navigator, 'languages', {get: () => ['zh-CN', 'zh', 'en']});
+                window.chrome = {runtime: {}};
+            """)
 
             try:
                 page.goto(url, timeout=30000, wait_until="domcontentloaded")
                 try:
                     page.wait_for_selector("a[href*='house-type/detail'], a[href*='detail']", timeout=15000)
                 except Exception as e:
-                    logger.warning("[泊寓] 等待房源列表超时: %s", e)
+                    logger.warning("[泊寓] 等待房源列表超时，可能是被验证码拦截/数据为空，正在截图排查...")
+                    try:
+                        page.screenshot(path="inboyu_error.png")
+                        logger.info("[泊寓] 错误现场已截图保存为 inboyu_error.png，请查看。")
+                    except Exception:
+                        pass
                 page.wait_for_timeout(2000)
 
                 html = page.content()

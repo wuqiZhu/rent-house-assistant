@@ -30,6 +30,7 @@ class DoubanScraper(BaseScraper):
         include_keywords=None,
         request_interval=6.0,
         max_detail_fetches=50,
+        prefs=None,
     ):
         super().__init__(request_interval=request_interval)
         self.groups = groups or DEFAULT_GROUPS
@@ -39,6 +40,7 @@ class DoubanScraper(BaseScraper):
         self.include_keywords = include_keywords or []
         self.max_detail_fetches = max_detail_fetches
         self._detail_fetch_count = 0
+        self.prefs = prefs
 
     @property
     def source_name(self):
@@ -186,10 +188,32 @@ class DoubanScraper(BaseScraper):
                     area = self._extract_area(title)
                     rooms = self._extract_rooms(title)
                     
-                    desc_text = ""
+                    # 前置初筛判定：若缺价格/面积等，是否值得进入详情页深挖？
+                    should_deep_fetch = False
                     if (not price or not area or not rooms) and self._detail_fetch_count < self.max_detail_fetches:
+                        if self.prefs:
+                            # 预打分
+                            dummy_listing = HousingListing(
+                                listing_id=listing_id, source=self.source_name, title=title, 
+                                price=1, area=1, url=link, district="", address=""
+                            )
+                            from scoring import _score_location, _score_quiet, WEIGHT_LOCATION
+                            loc_score = _score_location(dummy_listing, self.prefs)
+                            quiet_score = _score_quiet(dummy_listing)
+                            
+                            # 如果地理位置命中了偏好 (loc_score > 默认低分) 或者有极好的关键字，才深挖
+                            if loc_score > WEIGHT_LOCATION * 0.6 or quiet_score > 0:
+                                should_deep_fetch = True
+                            else:
+                                logger.info(f"[豆瓣] 跳过详情页深挖(初筛落选): {title[:15]}...")
+                        else:
+                            # 没有提供偏好则直接判定可以深挖
+                            should_deep_fetch = True
+
+                    desc_text = ""
+                    if should_deep_fetch:
                         self._detail_fetch_count += 1
-                        logger.info(f"[豆瓣] 标题缺信息，进入详情页({self._detail_fetch_count}/{self.max_detail_fetches}): {title[:15]}...")
+                        logger.info(f"[豆瓣] 标题缺信息，初筛命中，进入详情页({self._detail_fetch_count}/{self.max_detail_fetches}): {title[:15]}...")
                         try:
                             # 详情页防频繁请求风控，进入详情之后稍作等待然后退回/不退回直接新建tab也可以，但新建更稳
                             detail_page = page.context.new_page()
