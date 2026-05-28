@@ -126,31 +126,39 @@ class InboyuScraper(BaseScraper):
         if not href.startswith("http"):
             href = INBOYU_BASE + href
 
+        logger.info(f"[泊寓解析] 原始文本: {text}")
+
         title_match = re.search(r"(泊寓[^\d]*?店)", text)
         if not title_match:
             title_match = re.search(r"([^\d]+?)(?:\d+个户型)", text)
         title = title_match.group(1).strip() if title_match else text[:30]
+        logger.info(f"[泊寓解析] 标题: {title}")
 
         if not title or len(title) < 3:
+            logger.warning(f"[泊寓解析] 标题过短，跳过")
             return None
 
         rooms_match = re.search(r"(\d+)个户型", text)
         rooms = rooms_match.group(1) if rooms_match else ""
+        logger.info(f"[泊寓解析] 户型数: {rooms}")
 
         address = ""
         addr_match = re.search(r"户型(.+?)(?:\d+\.?\d*元)", text)
         if addr_match:
             address = addr_match.group(1).strip()
+        logger.info(f"[泊寓解析] 地址: {address}")
 
         price = 0.0
         price_match = re.search(r"(\d+(?:\.\d+)?)\s*元/月(?:起)?", text)
         if price_match:
             price = float(price_match.group(1))
+        logger.info(f"[泊寓解析] 价格: {price}")
 
         area = None
         area_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:㎡|平米|m2)", text)
         if area_match:
             area = float(area_match.group(1))
+        logger.info(f"[泊寓解析] 面积: {area}")
 
         district = city_name
         if address:
@@ -159,8 +167,11 @@ class InboyuScraper(BaseScraper):
                 if d in address:
                     district = d
                     break
+        logger.info(f"[泊寓解析] 区域: {district}")
 
         listing_id = generate_listing_id(self.source_name, href)
+
+        logger.info(f"[泊寓解析] 解析成功: {title} | {price}元 | {area}㎡ | {district}")
 
         return HousingListing(
             listing_id=listing_id,
